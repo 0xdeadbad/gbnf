@@ -6,32 +6,42 @@ import (
 
 type Lexer struct {
 	*CharReader
-	Tokens         []*Token
-	tokenTmpBuffer []*Token
-	runeTmpBuffer  []rune
-	line           uint
-	column         uint
+	Tokens        []*Token
+	runeTmpBuffer []rune
+	currentState  StateFn
+	tokenChan     chan *Token
+	line          uint
+	column        uint
 }
 
 func NewLexer(r io.ReadSeeker) *Lexer {
 	return &Lexer{
-		CharReader:     newCharReader(r),
-		Tokens:         make([]*Token, 0),
-		tokenTmpBuffer: make([]*Token, 0),
-		runeTmpBuffer:  make([]rune, 0),
-		line:           0,
-		column:         0,
+		CharReader:    newCharReader(r),
+		Tokens:        make([]*Token, 0),
+		currentState:  lexToken,
+		runeTmpBuffer: make([]rune, 0),
+		tokenChan:     make(chan *Token, 2),
+		line:          0,
+		column:        0,
 	}
 }
 
-func (l *Lexer) NextToken() error {
-
-	_, err := lexToken(l)
-	if err != nil {
-		return err
+func (l *Lexer) NextToken() (*Token, error) {
+	var err error = nil
+	var state StateFn
+	for {
+		select {
+		case token := <-l.tokenChan:
+			return token, nil
+		default:
+			state, err = l.currentState(l)
+			if err != nil {
+				return nil, err
+			}
+			l.clearRuneTmpBuffer()
+			l.currentState = state
+		}
 	}
-
-	return nil
 }
 
 func (l *Lexer) nextChar() (rune, error) {
@@ -53,25 +63,16 @@ func (l *Lexer) peekChar() (rune, error) {
 }
 
 func (l *Lexer) emitTokenOpts(lexeme string, line, column uint, typ TokenType) {
-	l.Tokens = append(l.Tokens, NewToken(lexeme, line, column, typ))
+	token := NewToken(lexeme, line, column, typ)
+	l.Tokens = append(l.Tokens, token)
+
+	l.tokenChan <- token
 }
 
 func (l *Lexer) emitToken(typ TokenType) {
 	l.emitTokenOpts(string(l.runeTmpBuffer), l.line, l.column, typ)
 }
 
-func (l *Lexer) emitTmpTokenOpts(lexeme string, line, column uint, typ TokenType) {
-	l.Tokens = append(l.tokenTmpBuffer, NewToken(lexeme, line, column, typ))
-}
-
-func (l *Lexer) emitTmpToken(typ TokenType) {
-	l.emitTmpTokenOpts(string(l.runeTmpBuffer), l.line, l.column, typ)
-}
-
 func (l *Lexer) clearRuneTmpBuffer() {
 	l.runeTmpBuffer = l.runeTmpBuffer[:0]
-}
-
-func (l *Lexer) clearTokenTmpBuffer() {
-	l.tokenTmpBuffer = l.tokenTmpBuffer[:0]
 }

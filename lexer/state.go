@@ -111,7 +111,7 @@ func skipWhitespace(l *Lexer) error {
 type StateFn func(*Lexer) (StateFn, error)
 
 func lexToken(l *Lexer) (StateFn, error) {
-	r, err := l.nextChar()
+	r, err := l.peekChar()
 	if err != nil {
 		return nil, err
 	}
@@ -130,16 +130,7 @@ func lexToken(l *Lexer) (StateFn, error) {
 		state = lexTerminalSymbol
 	}
 
-	for state != nil {
-		state, err = state(l)
-		if err != nil {
-			return nil, err
-		}
-		// Clear the temporary buffer after each state
-		l.clearRuneTmpBuffer()
-	}
-
-	return nil, nil
+	return state, nil
 }
 
 func lexAction(l *Lexer) (StateFn, error) {
@@ -154,6 +145,7 @@ func lexAction(l *Lexer) (StateFn, error) {
 	}
 
 	l.emitToken(Action)
+	l.clearRuneTmpBuffer()
 
 	if err := advanceChar(l); err != nil {
 		return nil, err
@@ -199,21 +191,21 @@ func lexActionArg(l *Lexer) (StateFn, error) {
 
 	l.emitTokenOpts(string(l.runeTmpBuffer[len(l.runeTmpBuffer)-1]), l.line, l.column, ParenRight)
 
-	return nil, nil
+	return lexToken, nil
 }
 
 func lexEnclosedLeft(l *Lexer) (StateFn, error) {
 	var tokenType TokenType
 	var r1, expected rune
 
-	r1 = l.buffer[0]
+	r1, err := l.nextChar()
+	if err != nil {
+		return nil, err
+	}
 	l.clearRuneTmpBuffer()
 
 	switch r1 {
 	case '{':
-		if err := advanceChar(l); err != nil {
-			return nil, err
-		}
 		return lexAction, nil
 	case '<':
 		tokenType = NonTerminalSymbol
@@ -228,7 +220,7 @@ func lexEnclosedLeft(l *Lexer) (StateFn, error) {
 		return nil, ErrUnexpectedRune
 	}
 
-	err := readNextCharWhile(l, func(r rune) bool {
+	err = readNextCharWhile(l, func(r rune) bool {
 		return r != expected
 	})
 	switch err {
@@ -236,7 +228,7 @@ func lexEnclosedLeft(l *Lexer) (StateFn, error) {
 		break
 	case io.EOF:
 		l.emitToken(tokenType)
-		return nil, nil
+		return lexToken, nil
 	default:
 		return nil, err
 	}
@@ -255,7 +247,7 @@ func lexEnclosedLeft(l *Lexer) (StateFn, error) {
 		return nil, err
 	}
 
-	return nil, nil
+	return lexToken, nil
 }
 
 func lexTerminalSymbol(l *Lexer) (StateFn, error) {
@@ -281,11 +273,19 @@ func lexTerminalSymbol(l *Lexer) (StateFn, error) {
 
 	l.emitToken(TerminalSymbol)
 
-	return nil, nil
+	return lexToken, nil
 }
 
 func lexAssignment(l *Lexer) (StateFn, error) {
 	r, err := l.nextChar()
+	if err != nil {
+		return nil, err
+	}
+	if r != ':' {
+		return nil, ErrUnexpectedRune
+	}
+
+	r, err = l.nextChar()
 	if err != nil {
 		return nil, err
 	}
@@ -303,13 +303,21 @@ func lexAssignment(l *Lexer) (StateFn, error) {
 
 	l.emitToken(Assignment)
 
-	return nil, nil
+	return lexToken, nil
 }
 
 func lexOr(l *Lexer) (StateFn, error) {
+	r, err := l.nextChar()
+	if err != nil {
+		return nil, err
+	}
+	if r != '|' {
+		return nil, ErrUnexpectedRune
+	}
+
 	l.emitToken(Or)
 
-	return nil, nil
+	return lexToken, nil
 }
 
 func lexWhitespace(l *Lexer) (StateFn, error) {
