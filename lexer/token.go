@@ -22,18 +22,34 @@ func (t *Token) String() string {
 	return fmt.Sprintf("[%s:%s:%d:%d]", t.Lexeme, t.Type, t.Line, t.Column)
 }
 
+func (t *Token) TokenType() TokenType {
+	return t.Type
+}
+
+func (t *Token) TokenLexeme() string {
+	return t.Lexeme
+}
+
 type TokenType uint
 
 const (
 	TerminalSymbol TokenType = iota
 	NonTerminalSymbol
-	Assignment
+	ProdRule
 	Or
+	And
 	String
 	Action
 	ParenLeft
 	ParenRight
+	BracketLeft
+	BracketRight
 	ActionArg
+	Assign
+	Sequence
+	EndMark
+	EndOfRule
+	Not
 )
 
 func (t TokenType) String() string {
@@ -42,10 +58,12 @@ func (t TokenType) String() string {
 		return "TerminalSymbol"
 	case NonTerminalSymbol:
 		return "NonTerminalSymbol"
-	case Assignment:
-		return "Assignment"
+	case ProdRule:
+		return "ProdRule"
 	case Or:
 		return "Or"
+	case And:
+		return "And"
 	case String:
 		return "String"
 	case Action:
@@ -54,8 +72,22 @@ func (t TokenType) String() string {
 		return "ParenLeft"
 	case ParenRight:
 		return "ParenRight"
+	case BracketLeft:
+		return "BracketLeft"
+	case BracketRight:
+		return "BracketRight"
 	case ActionArg:
 		return "ActionArg"
+	case Assign:
+		return "Assign"
+	case Sequence:
+		return "Sequence"
+	case EndMark:
+		return "EndMark"
+	case EndOfRule:
+		return "EndOfRule"
+	case Not:
+		return "Not"
 	default:
 		return "Unknown"
 	}

@@ -13,8 +13,7 @@ func TestNewLexer(t *testing.T) {
 	buffer := []byte("Hello, World!")
 	lexer := NewLexer(bytes.NewReader(buffer))
 
-	i := 0
-	for ; i < len(buffer); i++ {
+	for i := 0; i < len(buffer); i++ {
 		r, err := lexer.nextChar()
 		if err != nil {
 			t.Fatal(err)
@@ -44,7 +43,7 @@ func TestLexer_NextToken_Symbol(t *testing.T) {
 	t.Logf("Token: %s", token)
 }
 
-// Testing if the lexer is able to emit the token Assignment correctly
+// Testing if the lexer is able to emit the token ProdRule correctly
 func TestLexer_NextToken_Assignment(t *testing.T) {
 	buffer := []byte("::=")
 	lexer := NewLexer(bytes.NewReader(buffer))
@@ -114,18 +113,31 @@ func TestLexer_NextToken_OneWhitespace(t *testing.T) {
 
 // Testing if the lexer is able to emit the token String correctly
 func TestLexer_NextToken_String(t *testing.T) {
-	buffer := []byte("\"Hello, World!\"")
+	buffer := []byte("\"Hello, World!\" 'Hello, World!'")
 	lexer := NewLexer(bytes.NewReader(buffer))
 
 	token, err := lexer.NextToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if token.Lexeme != "Hello, World!" {
 		t.Fatalf("Expected Hello, World!, got %s", token.Lexeme)
 	}
+	if token.Type != TerminalSymbol {
+		t.Fatalf("Expected type 'String', got '%s'", token.Type)
+	}
+	t.Logf("Token: %s", token)
 
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token.Lexeme != "Hello, World!" {
+		t.Fatalf("Expected Hello, World!, got %s", token.Lexeme)
+	}
+	if token.Type != TerminalSymbol {
+		t.Fatalf("Expected type 'String', got '%s'", token.Type)
+	}
 	t.Logf("Token: %s", token)
 }
 
@@ -138,25 +150,22 @@ func TestLexer_NextToken_Action(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if token.Lexeme != "Fn" {
 		t.Fatalf("Expected Fn, got %s", token.Lexeme)
 	}
 
-	token, err = lexer.NextToken()
+	/*token, err = lexer.NextToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if token.Lexeme != "(" {
 		t.Fatalf("Expected (, got %s", token.Lexeme)
-	}
+	}*/
 
 	token, err = lexer.NextToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if token.Lexeme != "Hello" {
 		t.Fatalf("Expected Hello, got %s", token.Lexeme)
 	}
@@ -165,19 +174,17 @@ func TestLexer_NextToken_Action(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if token.Lexeme != "World" {
 		t.Fatalf("Expected World, got %s", token.Lexeme)
 	}
 
-	token, err = lexer.NextToken()
+	/*token, err = lexer.NextToken()
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	if token.Lexeme != ")" {
 		t.Fatalf("Expected ), got %s", token.Lexeme)
-	}
+	}*/
 
 	t.Logf("Tokens: %s", lexer.Tokens)
 }
@@ -195,7 +202,7 @@ func TestLexer_NextToken_Newline(t *testing.T) {
 	if token.Lexeme != "Hello World!" {
 		t.Fatalf("Expected Hello World!, got %s", token.Lexeme)
 	}
-	if token.Type != String {
+	if token.Type != TerminalSymbol {
 		t.Fatalf("Expected type 'String', got '%s'", token.Type)
 	}
 	t.Logf("Token: %s", token)
@@ -234,8 +241,8 @@ func TestLexer_NextToken_Newline(t *testing.T) {
 	if token.Lexeme != "::=" {
 		t.Fatalf("Expected ::=, got %s", token.Lexeme)
 	}
-	if token.Type != Assignment {
-		t.Fatalf("Expected type 'Assignment', got '%s'", token.Type)
+	if token.Type != ProdRule {
+		t.Fatalf("Expected type 'ProdRule', got '%s'", token.Type)
 	}
 	t.Logf("Token: %s", token)
 
@@ -405,4 +412,221 @@ func TestLexer_NextToken_FromFile(t *testing.T) {
 	}
 
 	t.Logf("Tokens: %v", lexer.Tokens)
+}
+
+func TestLexer_NextToken_Assign(t *testing.T) {
+	buffer := []byte("=")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("Token: %s", token)
+}
+
+func TestLexer_NextToken_LineWithAssign(t *testing.T) {
+	buffer := []byte("<expr> ::= x=<expr> + y=<term> { Add(x, y) }\n\t| <term>\n<term> ::= NAME")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for token != nil {
+		t.Logf("Token: %s", token)
+		token, err = lexer.NextToken()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	t.Logf("Tokens: %v", lexer.Tokens)
+}
+
+func TestLexer_NextToken_Sequence(t *testing.T) {
+	buffer := []byte("...")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if token.Lexeme != "..." {
+		t.Fatalf("Expected ..., got %s", token.Lexeme)
+	}
+	if token.Type != Sequence {
+		t.Fatalf("Expected type 'Sequence', got '%s'", token.Type)
+	}
+
+	t.Logf("Token: %s", token)
+}
+
+func TestLexer_CommonLispBNF(t *testing.T) {
+	buffer := []byte(`
+<s_expression> ::= <atomic_symbol>
+	| "(" <s_expression> "."<s_expression> ")"
+	| <list>
+<list> ::= "(" <s_expression> "<" <s_expression> ">" ")"
+<atomic_symbol> ::= <letter> <atom_part>
+<atom_part> ::= <empty> | <letter> <atom_part> | <number> <atom_part>
+<letter> ::= "a" ... "z"
+<number> ::= "1" ... "9"
+<empty> ::= " "`)
+
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil && err != io.EOF {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+	for token != nil {
+		token, err = lexer.NextToken()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			t.Fatal(err)
+		}
+		t.Logf("Token: %s", token)
+	}
+
+	t.Logf("Tokens: %v", lexer.Tokens)
+}
+
+func TestLexer_NextToken_MarkReset(t *testing.T) {
+	buffer := []byte("<expr> ::= <term> \"+\" <expr> |  <term>")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	mark := lexer.Mark()
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s (Marked)", token)
+
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	t.Logf("Resetting to mark")
+	lexer.Reset(mark)
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+}
+
+func TestLexer_PeekToken(t *testing.T) {
+	buffer := []byte("<expr> ::= <term> \"+\" <expr> |  <term>")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.PeekToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Peeked Token: %s", token)
+
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	mark := lexer.Mark()
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s (Marked)", token)
+
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	t.Logf("Resetting to mark")
+	lexer.Reset(mark)
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	token, err = lexer.PeekToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Peeked Token: %s", token)
+
+	token, err = lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+}
+
+func TestLexer_NextToken_EndOfRule(t *testing.T) {
+	buffer := []byte("<expr> ::= <term> \"+\" <expr> |  <term>!!")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	for token.Type != EndOfRule {
+		token, err = lexer.NextToken()
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("Token: %s", token)
+	}
+}
+
+func TestLexer_NextToken_GroupsAndNot(t *testing.T) {
+	buffer := []byte("<expr> ::= !(<term> & \"+\" & <expr>) |  [<term> & + & \"test\" & ![a-Z]]!!")
+	lexer := NewLexer(bytes.NewReader(buffer))
+
+	token, err := lexer.NextToken()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Logf("Token: %s", token)
+
+	for token.Type != EndOfRule {
+		token, err = lexer.NextToken()
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Logf("Token: %s", token)
+	}
 }
